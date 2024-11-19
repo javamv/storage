@@ -1,11 +1,11 @@
 import { NestFactory } from '@nestjs/core';
-import { EggsModule } from './storage.module';
+import { StorageModule } from './storage.module';
 import { ConfigService } from '@nestjs/config';
 import { MicroserviceOptions } from '@nestjs/microservices';
 import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory } from './storage.config'; // Import both factories
 
 async function bootstrap() {
-  const app = await NestFactory.create(EggsModule);
+  const app = await NestFactory.create(StorageModule);
   const configService = app.get(ConfigService);
 
   app.enableCors({
@@ -32,7 +32,7 @@ async function bootstrap() {
 
   // Start the HTTP server
   await app.listen(port);
-  console.log(`Eggs service is set to run on http://localhost:${port}`);
+  console.log(`Storage service is set to run on http://localhost:${port}`);
   console.log(`gRPC server is running on ${grpcOptions.options.url}`);
   console.log(`Kafka service is connected with brokers: ${kafkaOptions.options.client.brokers}`);
   console.log(`Mongoose is connected with mongodb: ${mongoOptions.uri}`);

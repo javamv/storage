@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Job, JobSchema } from './schemas/job.schema';
 import { ClientsModule } from '@nestjs/microservices';
-import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory } from './storage.config';
+import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioClientFactory } from './storage.config';
 
 @Module({
   imports: [
@@ -39,6 +39,13 @@ import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory } from 
     ]),
   ],
   controllers: [],
-  providers: [],
+  providers: [
+    {
+      provide: 'MINIO_CLIENT',
+      useFactory: minioClientFactory,
+      inject: [ConfigService],
+    },
+  ],
+  exports: ['MINIO_CLIENT'], // Export the client for use in other services
 })
-export class EggsModule {}
+export class StorageModule {}

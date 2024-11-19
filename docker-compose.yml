@@ -1,5 +1,22 @@
 services:
 
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: adminadmin12
+    volumes:
+      - minio-data:/data
+      - minio-config:/root/.minio
+    command: server /data --console-address ":9001"
+    restart: always
+    networks:
+      - shared_network
+
   mongodb:
     image: mongo:8.0-rc
     container_name: mongodb
@@ -34,6 +51,10 @@ services:
 
 volumes:
   mongo-data:
+  minio-data:
+    driver: local
+  minio-config:
+    driver: local
 
 networks:
   shared_network:
