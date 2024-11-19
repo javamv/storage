@@ -14,7 +14,7 @@ export const grpcOptionsFactory = async (configService: ConfigService): Promise<
     transport: Transport.GRPC,
     options: {
       package: 'auth', // Match this with your proto package name
-      protoPath: join(__dirname, 'auth.proto'), // Adjust the path as necessary
+      protoPath: join(__dirname, 'auth/auth.proto'), // Adjust the path as necessary
       url: `0.0.0.0:${grpcPort}`, // Set the gRPC server to listen on a different port
       onLoadPackageDefinition: (pkg, server) => {
         new ReflectionService(pkg).addToServer(server); // Enable gRPC reflection for service discovery

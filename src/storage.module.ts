@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { Job, JobSchema } from './schemas/job.schema';
+import { SObject, SObjectSchema } from './schemas/sobject.schema';
 import { ClientsModule } from '@nestjs/microservices';
-import { MinioConnector } from './connectors/minio.connector'
+import { MinioConnector } from './connectors/minio.connector';
 import { VideoService } from './services/video.service';
+import { StorageController } from './storage.controller';
+import { MongoService } from './services/mongo.service';
 import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioClientFactory } from './storage.config';
 
 @Module({
@@ -21,7 +23,7 @@ import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioC
     }),
     // Mongoose schema registration
     MongooseModule.forFeature([
-      { name: Job.name, schema: JobSchema },
+      { name: SObject.name, schema: SObjectSchema },
     ]),
     // Registering gRPC service
     ClientsModule.registerAsync([
@@ -40,9 +42,10 @@ import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioC
       },
     ]),
   ],
-  controllers: [],
+  controllers: [StorageController],
   providers: [
     MinioConnector,
+    MongoService,
     VideoService,
     {
       provide: 'MINIO_CLIENT',
