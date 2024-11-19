@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Job, JobSchema } from './schemas/job.schema';
 import { ClientsModule } from '@nestjs/microservices';
 import { MinioConnector } from './connectors/minio.connector'
+import { VideoService } from './services/video.service';
 import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioClientFactory } from './storage.config';
 
 @Module({
@@ -42,12 +43,13 @@ import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioC
   controllers: [],
   providers: [
     MinioConnector,
+    VideoService,
     {
       provide: 'MINIO_CLIENT',
       useFactory: minioClientFactory,
       inject: [ConfigService],
     },
   ],
-  exports: ['MINIO_CLIENT', MinioConnector], // Export the client for use in other services
+  exports: ['MINIO_CLIENT', MinioConnector, VideoService], // Export the client for use in other services
 })
 export class StorageModule {}
