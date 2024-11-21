@@ -1,64 +1,78 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, HttpStatus } from '@nestjs/common';
-import * as request from 'supertest';
-import { StorageModule } from '../src/storage.module'; // Replace with the actual module containing your controller
-import * as dotenv from 'dotenv';
-import mongoose from 'mongoose';
+import { Test, TestingModule } from "@nestjs/testing";
+import { INestApplication, HttpStatus } from "@nestjs/common";
+import * as request from "supertest";
+import { StorageModule } from "../src/storage.module"; // Replace with the actual module containing your controller
+import * as dotenv from "dotenv";
+import { Types } from "mongoose";
+import { MinioConnector } from "../src/connectors/minio.connector";
+import { StorageService } from "../src/services/storage.service";
 
-dotenv.config({ path: './.env.dev' });  // Load the dev.env for this test
+dotenv.config({ path: "./.env.dev" }); // Load the dev.env for this test
 
-describe('MinIOController (Integration)', () => {
+describe("MinIOController (Integration)", () => {
   let app: INestApplication;
 
-  const mockStorageService = {
+// Helper function to create mock Mongoose documents
+const createMockDocument = (data: any) => {
+  // Mock the Mongoose Document structure
+  const mockDoc: any = {
+    ...data,
+    save: jest.fn().mockResolvedValue(data), // Mock the save method
+    toObject: jest.fn().mockReturnValue(data), // Simulate the toObject method
+    _id: new Types.ObjectId(), // Mock the ObjectId
+  };
+  return mockDoc;
+};
+
+  const mockMinioConnector = {
     // Mock for listAllObjects, which handles multiple buckets
     listAllObjects: jest.fn().mockImplementation((bucket) => {
       // Generate unique objects based on the bucket name
       const objectData = {
-        'l1-raw': [
+        "l1-raw": [
           {
-            id: '1',
-            bucket: 'l1-raw',
-            name: 'l1-raw-file1.txt',
+            id: "1",
+            bucket: "l1-raw",
+            name: "l1-raw-file1.txt",
             active: true,
             metadata: {},
           },
           {
-            id: '2',
-            bucket: 'l1-raw',
-            name: 'l1-raw-file2.txt',
-            active: true,
-            metadata: {},
-          },
-        ],
-        'l2-prep': [
-          {
-            id: '3',
-            bucket: 'l2-prep',
-            name: 'l2-prep-file1.txt',
-            active: true,
-            metadata: {},
-          },
-          {
-            id: '4',
-            bucket: 'l2-prep',
-            name: 'l2-prep-file2.txt',
+            id: "2",
+            bucket: "l1-raw",
+            name: "l1-raw-file2.txt",
             active: true,
             metadata: {},
           },
         ],
-        'l3-rel': [
+        "l2-prep": [
           {
-            id: '5',
-            bucket: 'l3-rel',
-            name: 'l3-rel-file1.txt',
+            id: "3",
+            bucket: "l2-prep",
+            name: "l2-prep-file1.txt",
             active: true,
             metadata: {},
           },
           {
-            id: '6',
-            bucket: 'l3-rel',
-            name: 'l3-rel-file2.txt',
+            id: "4",
+            bucket: "l2-prep",
+            name: "l2-prep-file2.txt",
+            active: true,
+            metadata: {},
+          },
+        ],
+        "l3-rel": [
+          {
+            id: "5",
+            bucket: "l3-rel",
+            name: "l3-rel-file1.txt",
+            active: true,
+            metadata: {},
+          },
+          {
+            id: "6",
+            bucket: "l3-rel",
+            name: "l3-rel-file2.txt",
             active: true,
             metadata: {},
           },
@@ -68,29 +82,23 @@ describe('MinIOController (Integration)', () => {
     }),
   };
 
-  const mockDbService = {
+  const mockStorageService = {
     // Mocking the method that updates bucket data
     updateBucketData: jest.fn().mockResolvedValue(true),
 
     // Mocking the method that retrieves all active objects
     getAllActiveObjects: jest.fn().mockResolvedValue([
-      // Reflecting the SObject schema
-      {
-        _id: 12234,  // MongoDB's unique document ID (not the same as 'id')
-        id: '1',      // 'id' is a string, required and unique
-        bucket: 'l1-raw', // 'bucket' is a string, required
-        name: 'l1-raw-file1.txt', // 'name' is a string, required
-        active: true, // 'active' is a boolean, defaults to true
-        metadata: {}, // 'metadata' is optional, can be an object
-      },
-      {
-        _id: 12366,
-        id: '2',
-        bucket: 'l2-prep',
-        name: 'l2-prep-file1.txt',
+      // Reflecting the SObject schema, but returning mock Mongoose documents
+      createMockDocument({
+        bucket: "l1-raw",
+        name: "l1-raw-file1.txt",
         active: true,
-        metadata: {},
-      },
+      }),
+      createMockDocument({
+        bucket: "l2-prep",
+        name: "l2-prep-file1.txt",
+        active: true,
+      }),
     ]),
   };
 
@@ -98,10 +106,10 @@ describe('MinIOController (Integration)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [StorageModule],
     })
-      .overrideProvider('StorageService') // Replace with your actual service token
+      .overrideProvider(MinioConnector) // Replace with your actual service token
+      .useValue(mockMinioConnector)
+      .overrideProvider(StorageService) // Replace with your actual service token
       .useValue(mockStorageService)
-      .overrideProvider('DbService') // Replace with your actual service token
-      .useValue(mockDbService)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -112,34 +120,38 @@ describe('MinIOController (Integration)', () => {
     await app.close();
   });
 
-  it('/sync-minio-structure (GET) - Success', async () => {
+  beforeEach(() => {
+    jest.clearAllMocks(); // Or jest.resetAllMocks() if you want to reset implementations
+  });
+
+  it("/sync-minio-structure (GET) - Success", async () => {
     const response = await request(app.getHttpServer())
-      .get('/api/sync-minio-structure') // Replace with your actual route
-      .set('Authorization', 'Bearer valid_token'); // Replace with your auth header
+      .get("/api/sync-minio-structure")
+      .set("Authorization", "Bearer valid_token");
 
     expect(response.status).toBe(HttpStatus.OK);
     expect(response.body).toEqual({
-      'l1-raw': [{ key: 'l1-raw-file1.txt' }],
-      'l2-prep': [{ key: 'l2-prep-file1.txt' }],
+      "l1-raw": [{ name: "l1-raw-file1.txt", "active": true }],
+      "l2-prep": [{ name: "l2-prep-file1.txt", "active": true }],
     });
 
-    expect(mockStorageService.listAllObjects).toHaveBeenCalledTimes(3);
-    expect(mockDbService.updateBucketData).toHaveBeenCalledTimes(1);
-    expect(mockDbService.getAllActiveObjects).toHaveBeenCalledTimes(1);
+    expect(mockMinioConnector.listAllObjects).toHaveBeenCalledTimes(3);
+    expect(mockStorageService.updateBucketData).toHaveBeenCalledTimes(1);
+    expect(mockStorageService.getAllActiveObjects).toHaveBeenCalledTimes(1);
   });
 
-  it('/sync-minio-structure (GET) - Error', async () => {
-    mockStorageService.listAllObjects.mockRejectedValueOnce(
-      new Error('MinIO Service Error')
+  it("/sync-minio-structure (GET) - Error", async () => {
+    mockMinioConnector.listAllObjects.mockRejectedValueOnce(
+      new Error("MinIO Service Error")
     );
 
     const response = await request(app.getHttpServer())
-      .get('/sync-minio-structure')
-      .set('Authorization', 'Bearer valid_token'); // Replace with your auth header
+      .get("/api/sync-minio-structure")
+      .set("Authorization", "Bearer valid_token");
 
     expect(response.status).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
-    expect(response.body).toEqual({ error: 'MinIO Service Error' });
+    expect(response.body).toEqual({ error: "MinIO Service Error" });
 
-    expect(mockStorageService.listAllObjects).toHaveBeenCalledTimes(1);
+    expect(mockMinioConnector.listAllObjects).toHaveBeenCalledTimes(3);
   });
 });

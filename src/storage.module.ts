@@ -6,7 +6,7 @@ import { ClientsModule } from '@nestjs/microservices';
 import { MinioConnector } from './connectors/minio.connector';
 import { VideoService } from './services/video.service';
 import { StorageController } from './storage.controller';
-import { MongoService } from './services/mongo.service';
+import { StorageService } from './services/storage.service';
 import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioClientFactory } from './storage.config';
 
 @Module({
@@ -45,7 +45,7 @@ import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioC
   controllers: [StorageController],
   providers: [
     MinioConnector,
-    MongoService,
+    StorageService,
     VideoService,
     {
       provide: 'MINIO_CLIENT',

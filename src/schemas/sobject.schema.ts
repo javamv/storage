@@ -1,5 +1,5 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
 // Define the SObject schema
 @Schema()
@@ -15,6 +15,18 @@ export class SObject extends Document {
   // The name of the SObject (e.g., file name or object name)
   @Prop({ required: true })
   name: string;
+
+  // The name of the SObject (e.g., file name or object name)
+  @Prop({ required: true })
+  etag: string;
+
+  // The name of the SObject (e.g., file name or object name)
+  @Prop({ required: true })
+  size: number;
+
+  // The name of the SObject (e.g., file name or object name)
+  @Prop({ required: true })
+  lastModified: Date;
 
   // Whether the SObject is active or not, useful for flagging deleted or archived objects
   @Prop({ default: true })
