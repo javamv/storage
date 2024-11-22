@@ -61,27 +61,27 @@ export class StorageController {
     ) {
         try {
             this.logger.debug(`Received request to stream file: ${fileName}`);
-            
+
             const fileStats = await this.storage.getObjectStats('l1-raw', fileName);
             const fileSize = fileStats.size;
             this.logger.debug(`File size retrieved: ${fileSize} bytes`);
-    
+
             this.logger.debug(`Request range: ${range ? range : 'Full content requested'}`);
-    
+
             if (range) {
                 const parts = range.replace(/bytes=/, "").split("-");
                 const start = parseInt(parts[0], 10);
                 const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
                 this.logger.debug(`Parsed range - Start: ${start}, End: ${end}`);
-    
+
                 if (start >= fileSize) {
                     this.logger.warn(`Requested start (${start}) exceeds file size (${fileSize}).`);
                     return res.status(416).send('Requested range not satisfiable');
                 }
-    
+
                 const chunkSize = (end - start) + 1;
                 this.logger.debug(`Chunk size calculated: ${chunkSize} bytes`);
-    
+
                 res.writeHead(206, {
                     'Content-Range': `bytes ${start}-${end}/${fileSize}`,
                     'Accept-Ranges': 'bytes',
@@ -89,7 +89,7 @@ export class StorageController {
                     'Content-Type': 'video/mp4',
                 });
                 this.logger.debug(`Response headers for partial content set.`);
-    
+
                 const dataStream = await this.storage.getPartialObject('l1-raw', fileName, start, chunkSize);
                 this.logger.debug(`Streaming partial content...`);
                 dataStream.pipe(res);
@@ -99,7 +99,7 @@ export class StorageController {
                     'Content-Type': 'video/mp4',
                 });
                 this.logger.debug(`Response headers for full content set.`);
-    
+
                 const dataStream = await this.storage.getObject('l1-raw', fileName);
                 this.logger.debug(`Streaming full content...`);
                 dataStream.pipe(res);
@@ -150,43 +150,111 @@ export class StorageController {
             this.logger.error('No files provided');
             return res.status(HttpStatus.BAD_REQUEST).json({ message: 'No files provided' });
         }
-    
+
         this.logger.debug('Upload File Request Received');
         this.logger.debug(`Customer: ${customer}, Date: ${date}`);
         this.logger.debug(`Files: ${JSON.stringify(files)}`);
         this.logger.debug(`Number of files to upload: ${files.length}`);
-    
+
         try {
             const startTime = Date.now();
             this.logger.debug(`Start time: ${startTime}`);
-    
+
             for (const file of files) {
                 this.logger.debug(`Processing file: ${file.originalname}`);
-    
+
                 const objectName = `${customer}_${format(new Date(date), 'yyMMdd')}/${file.originalname}`;
                 this.logger.debug(`Generated object name: ${objectName}`);
-    
+
                 // Upload the file to MinIO
                 await this.storage.uploadFile('l1-raw', objectName, file.path);
                 this.logger.debug(`File uploaded: ${objectName}`);
-    
+
                 // Remove the file after upload
                 fs.unlinkSync(file.path);
                 this.logger.debug(`File removed from local storage: ${file.path}`);
             }
-    
+
             const endTime = Date.now();
             const duration = (endTime - startTime) / 1000;
             this.logger.debug(`End time: ${endTime}`);
             this.logger.debug(`Upload completed in ${duration} seconds`);
-    
+
             return res.status(HttpStatus.OK).json({ message: `Files uploaded successfully in ${duration} seconds` });
         } catch (error) {
             this.logger.error('Error during file upload:', error);
             return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: 'Error uploading files', error: error.message });
         }
     }
-    
+
+
+    @Post('cut-selection')
+    @UseGuards(AuthGuard)
+    async cutSelection(
+        @Body() body: { bucketName: string; objectName: string; selections: any[]; taskName: string },
+        @Res() res,
+    ) {
+        const { bucketName, objectName, selections } = body;
+        const sourcePath = `./downloads/${objectName}`;
+        const destinationPath = `./processed/${objectName}_v1.mp4`;
+
+        const startTime = Date.now();
+        // Extract the base name (without extension) and file extension
+        // Extract the file extension
+        const fileExtension = objectName.slice(objectName.lastIndexOf("."));
+        // Extract the base name (everything before the extension)
+        const baseName = objectName.slice(0, objectName.lastIndexOf("."));
+
+        // Construct the new object name with the start time inserted before the file extension
+        const uploadObjectName = `${baseName}_${startTime}${fileExtension}`;
+
+        this.logger.debug(`Starting cut-selection object: ${objectName}, bucket: ${bucketName}`);
+        try {
+            // Step 1: Download file from MinIO
+            this.logger.debug('Downloading file from MinIO...');
+            await this.storage.downloadFile(bucketName, objectName, sourcePath);
+            this.logger.debug('Download completed.');
+
+            // Step 2: Process the file with selections
+            if (selections && selections.length > 0) {
+                this.logger.debug('Processing file with provided selections...');
+                await this.video.cutSelections(sourcePath, destinationPath, selections);
+                this.logger.debug('File processing completed.');
+            } else {
+                this.logger.warn('No selections provided, skipping processing.');
+                return res
+                    .status(HttpStatus.BAD_REQUEST)
+                    .json({ message: 'Selections are required for processing.' });
+            }
+
+            // Step 3: Upload the processed file back to MinIO
+            this.logger.debug(`Uploading processed file to MinIO as ${uploadObjectName}...`);
+            await this.storage.uploadFile(bucketName, uploadObjectName, destinationPath);
+            this.logger.debug('Upload completed.');
+
+            // Step 4: Clean up temporary files
+            this.logger.debug('Cleaning up temporary files...');
+            await this.video.deleteFile(sourcePath);
+            await this.video.deleteFile(destinationPath);
+            this.logger.debug('Temporary files cleaned up.');
+
+            // Calculate and log duration
+            const endTime = Date.now();
+            const duration = (endTime - startTime) / 1000;
+            this.logger.debug(`Task completed in ${duration} seconds.`);
+
+            return res.status(HttpStatus.OK).json({
+                message: `File processed and uploaded successfully in ${duration} seconds.`,
+                processedObjectName: uploadObjectName
+            });
+        } catch (error) {
+            this.logger.error('Error processing file:', error);
+            return res
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .json({ message: 'Error processing file', error: error.message });
+        }
+    }
+
 
     private groupByBucket(data) {
         return data.reduce((acc, obj) => {

@@ -49,6 +49,29 @@ services:
     networks:
       - shared_network
 
+  muraxa-storage:
+    image: murant/muraxa-storage:latest
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=dev
+      - AUTH_SWITCH=OFF
+      - AUTH_GRPC=muraxa-auth:53001
+      - MONGO_URI=mongodb://mongodb:27017
+      - DB_NAME=storage
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ACCESS_KEY=admin
+      - MINIO_SECRET_KEY=adminadmin12
+      - PORT=3004
+      - KAFKA_BROKER_URL=broker:9094
+    depends_on:
+      - mongodb
+      - broker
+    command: dockerize -wait tcp://broker:9094 -timeout 500s node dist/main
+    networks:
+      - shared_network
+
 volumes:
   mongo-data:
   minio-data:

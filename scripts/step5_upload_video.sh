@@ -10,7 +10,7 @@ MINIO_BUCKET="l1-raw"
 # Test data for file upload
 CUSTOMER="test2"
 DATE="2024-11-21"
-FILE_PATH="/Users/user/Dev/muraxa/muraxa-services/storage/test/data/bmp_01p.mp4" # Path to the file to be uploaded
+FILE_PATH="test/data/bmp_01p.mp4" # Path to the file to be uploaded
 OBJECT_NAME="${CUSTOMER}_$(date -j -f "%Y-%m-%d" "$DATE" "+%y%m%d")/bmp_01p.mp4" # Object name format for macOS
 
 # Function to test the file upload, verify with mc, and call sync-minio-structure
@@ -40,7 +40,7 @@ test_upload_file() {
     fi
 
     # Step 3: Verify file upload using mc
-    echo "Verifying file upload in MinIO..."
+    echo "Verifying $OBJECT_NAME file upload in MinIO..."
     mc ls $MINIO_ALIAS/$MINIO_BUCKET/$OBJECT_NAME
 
     if [[ $? -eq 0 ]]; then
