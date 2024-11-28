@@ -57,16 +57,16 @@ export class VideoService {
                 });
                 return;
             }
-    
+
             const tempFiles = [];
             let segmentIndex = 0;
-    
+
             const processSegment = (from, to, callback) => {
                 const fileName = path.basename(sourcePath);
                 const tempFile = `./tmp/temp_${fileName}_segment_${segmentIndex}.mp4`;
                 this.ensureDirectoryExists(tempFile);
                 tempFiles.push(tempFile);
-    
+
                 ffmpeg(sourcePath)
                     .inputOptions(`-ss ${from}`)
                     .inputOptions(`-t ${to - from}`)
@@ -82,7 +82,7 @@ export class VideoService {
                     })
                     .run();
             };
-    
+
             const processSelections = (index) => {
                 if (index < selections.length) {
                     const { from, to } = selections[index];
@@ -91,14 +91,14 @@ export class VideoService {
                     concatenateSegments();
                 }
             };
-    
+
             const concatenateSegments = () => {
                 const command = ffmpeg();
-    
+
                 tempFiles.forEach(tempFile => {
                     command.input(tempFile);
                 });
-    
+
                 command
                     .on('end', () => {
                         // Clean up temporary files
@@ -112,7 +112,7 @@ export class VideoService {
                     })
                     .mergeToFile(destinationPath);
             };
-    
+
             processSelections(0);
         });
     }
@@ -120,49 +120,53 @@ export class VideoService {
     async videoFragmentation(
         videoFile: string,
         outputDir: string,
-        storagePath: string,
-        frameCallback: (frameIndex: number, frameId: string, framePath: string, storagePath: string, width: number, height: number) => void,
+        outputType: 'lossless' | 'preview'
     ): Promise<string> {
-
         const metadata = await this.extractMetadata(videoFile);
         const absolutePath = path.resolve(videoFile);
-    
+
         // Create output directory for frames
         if (!fs.existsSync(outputDir)) {
             fs.mkdirSync(outputDir, { recursive: true });
         }
-    
+
         return new Promise((resolve, reject) => {
-    
-            let frameCount = 0; // Keep track of the frame count
-            // Use ffmpeg to extract PNG frames
-            ffmpeg(absolutePath)
+            const ffmpegCommand = ffmpeg(absolutePath)
                 .on('progress', (progress) => {
-                    // Call the callback function with the frame number and current frame output
-                    const frameId = `frame-${frameCount.toString().padStart(5, '0')}.png`
-                    const currentFramePath = `${outputDir}/frame_${frameCount.toString().padStart(6, '0')}.png`;
-                    frameCallback(frameCount, frameId, currentFramePath, storagePath, metadata.width, metadata.height);
-                    frameCount++;
+                    console.log('Progress:', progress);
                 })
                 .on('start', (cmdline) => {
                     console.log('Started ffmpeg with command:', cmdline);
                 })
                 .on('end', () => {
-                    console.log('Frames succesfully created');
+                    console.log('Frames successfully created');
                     resolve('Frames extracted successfully');
                 })
-                // .on('stderr', (stderrLine) => {
-                //     console.log('FFmpeg stderr output:', stderrLine);
-                // })
                 .on('error', (err) => {
                     console.error('Error while extracting frames:', err);
                     reject(new Error(`Error extracting frames: ${err.message}`));
-                })
-                .output(`${outputDir}/frame_%05d.png`)
-                .outputOptions('-start_number 0')  
-                .run();
+                });
+
+            if (outputType === 'lossless') {
+                // Extract high-quality PNG frames
+                ffmpegCommand
+                    .output(`${outputDir}/frame_%05d.png`)
+                    .outputOptions('-start_number 0'); // Add lossless-specific options if needed
+            } else if (outputType === 'preview') {
+                // Extract lower-quality JPEG frames for browser preview
+                ffmpegCommand
+                    .output(`${outputDir}/frame_%05d.jpg`)
+                    .outputOptions('-q:v 5') // Lower quality for smaller file size
+                    .outputOptions('-start_number 0'); // Add browser-preview-specific options
+            } else {
+                reject(new Error(`Invalid outputType: ${outputType}`));
+                return;
+            }
+
+            ffmpegCommand.run();
         });
     }
+
 
     private ensureDirectoryExists(filePath: string): boolean {
         const dirname = path.dirname(filePath);

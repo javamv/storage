@@ -7,10 +7,14 @@ import { MinioConnector } from './connectors/minio.connector';
 import { VideoService } from './services/video.service';
 import { StorageController } from './storage.controller';
 import { StorageService } from './services/storage.service';
+import { IngestService } from './services/ingest.service';
+import { ZipFileProcessorService } from './services/zipfile.service';
+import { ScheduleModule } from '@nestjs/schedule';
 import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioClientFactory } from './storage.config';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: `.env.${process.env.NODE_ENV}`, 
@@ -44,9 +48,11 @@ import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioC
   ],
   controllers: [StorageController],
   providers: [
+    ZipFileProcessorService,
     MinioConnector,
     StorageService,
     VideoService,
+    IngestService,
     {
       provide: 'MINIO_CLIENT',
       useFactory: minioClientFactory,

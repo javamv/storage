@@ -6,6 +6,8 @@ export class MinioConnector {
 
     private readonly logger = new Logger(MinioConnector.name);
 
+    private readonly lockKey: string = 'default-lock-key';
+
     constructor(
         @Inject('MINIO_CLIENT') private readonly minioClient: MinioClient,
     ) { }
@@ -25,7 +27,7 @@ export class MinioConnector {
         try {
             // Upload the file from the local filesystem to the specified MinIO bucket
             const result = await this.minioClient.fPutObject(bucketName, objectName, filePath, metadata);
-            
+
             this.logger.log(`Successfully uploaded ${filePath} to ${bucketName}/${objectName} with ETag: ${result.etag}`);
             return result.etag;  // Return the ETag of the uploaded file
         } catch (err) {
@@ -80,7 +82,7 @@ export class MinioConnector {
         try {
             // Use MinIO's getPartialObject API to fetch a part of the object starting from 'offset' and with a given 'length'
             const dataStream = await this.minioClient.getPartialObject(bucketName, objectName, offset, length, getOpts);
-            
+
             this.logger.log(`Successfully fetched partial object ${objectName} from bucket ${bucketName}, offset: ${offset}, length: ${length}`);
             return dataStream;
         } catch (err) {
@@ -88,12 +90,12 @@ export class MinioConnector {
             throw err;
         }
     }
-    
+
     // New method to list all objects in a specified bucket
-    async listAllObjects(bucketName: string): Promise<any[]> {
+    async listAllObjects(bucketName: string, path: string): Promise<any[]> {
         try {
             const objects = [];
-            const stream = this.minioClient.listObjectsV2(bucketName, '', true);
+            const stream = this.minioClient.listObjectsV2(bucketName, path, true);
 
             return new Promise((resolve, reject) => {
                 stream.on('data', (obj) => {
@@ -131,6 +133,55 @@ export class MinioConnector {
             this.logger.log(`MinIO connection successful. Buckets: ${buckets.map((b) => b.name).join(', ')}`);
         } catch (error) {
             this.logger.error('Error connecting to MinIO:', error);
+        }
+    }
+
+    async acquireLock(): Promise<boolean> {
+        // Try to create a lock file for atomic operation
+        try {
+            const lockExists = await this.minioClient.statObject('locks', this.lockKey).catch(() => null);
+            if (lockExists) {
+                this.logger.warn('Lock already acquired by another process');
+                return false;
+            }
+
+            // Create lock to prevent other processes from executing concurrently
+            await this.obtainLock();
+            return true;
+        } catch (err) {
+            this.logger.error('Error acquiring lock:', err);
+            return false;
+        }
+    }
+
+    // Wrapper to obtain a lock by placing a "locked" object in the 'locks' bucket
+    private async obtainLock(): Promise<void> {
+        try {
+            await this.minioClient.putObject('l2-prep', this.lockKey, Buffer.from('locked'));
+        } catch (err) {
+            this.logger.error(`Error obtaining lock for ${this.lockKey}:`, err);
+            throw err;
+        }
+    }
+
+    // Wrapper to release the lock by removing the lock object from the 'locks' bucket
+    async releaseLock(): Promise<void> {
+        try {
+            await this.minioClient.removeObject('l2-prep', this.lockKey);
+        } catch (err) {
+            this.logger.error(`Error releasing lock for ${this.lockKey}:`, err);
+            throw err;
+        }
+    }
+
+    // Wrapper to remove an object from the 'l2-prep' bucket
+    async removeObject(bucket: string, name: string): Promise<void> {
+        try {
+            await this.minioClient.removeObject(bucket, name);
+            this.logger.log(`Object ${name} removed from ${bucket}`);
+        } catch (err) {
+            this.logger.error(`Error removing object ${name} from ${bucket}`, err);
+            throw err;
         }
     }
 }

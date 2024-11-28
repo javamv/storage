@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Query, Req, Res, UseGuards, UploadedFiles, HttpStatus, UseInterceptors, Logger, Headers } from '@nestjs/common';
 import { MinioConnector } from './connectors/minio.connector';  // Assume you create a service to interact with MinIO
 import { VideoService } from './services/video.service';  // Assume this handles video metadata extraction
+import { IngestService } from './services/ingest.service';  // Assume this handles video metadata extraction
 import { StorageService } from './services/storage.service';  // Mongo service to interact with your database
 import { AuthGuard } from './auth/auth.guard.rpc';  // Auth guard for route protection
 import * as fs from 'fs';
@@ -18,6 +19,7 @@ export class StorageController {
         private readonly storage: MinioConnector,
         private readonly video: VideoService,
         private readonly db: StorageService,
+        private readonly ingest: IngestService,
     ) { }
 
     @Get('sync-minio-structure')
@@ -27,7 +29,7 @@ export class StorageController {
             console.log('Start syncing MinIO buckets');
             const buckets = ["l1-raw", "l2-prep", "l3-rel"];
             const newBucketData = await Promise.all(buckets.map(async (bucket) => {
-                const objects = await this.storage.listAllObjects(bucket);
+                const objects = await this.storage.listAllObjects(bucket,'');
                 this.logger.debug(`fetched ${objects.length} objects from ${bucket} for syncing`);
                 return { bucket, objects };
             }));
@@ -255,15 +257,69 @@ export class StorageController {
         }
     }
 
+    @Post('ingest-video')
+    @UseGuards(AuthGuard)
+    async ingestVideo(
+        @Body() body: { objectName: string; projectName: string },
+        @Res() res
+    ) {
+        const { objectName, projectName } = body;
+
+        if (!objectName || !projectName) {
+            this.logger.error('Missing required parameters: objectName or projectName');
+            return res
+                .status(HttpStatus.BAD_REQUEST)
+                .json({ message: 'objectName and projectName are required.' });
+        }
+
+        const sourcePath = path.join('./downloads', objectName);
+
+        try {
+            this.logger.log(`Starting ingestion for object: ${objectName}, project: ${projectName}`);
+
+            // Step 1: Download file from MinIO
+            this.logger.debug('Downloading file from MinIO...');
+            await this.storage.downloadFile('l1-raw', objectName, sourcePath);
+            this.logger.debug('File downloaded successfully.');
+
+
+            const dstPath = `${path.basename(objectName)}`;
+
+            // Step 2: Initialize task ingestion
+            this.logger.debug('Initializing task ingestion...');
+            await this.ingest.videoToDatalake(dstPath, projectName, sourcePath);
+            this.logger.log('Task ingestion completed successfully.');
+
+            // Step 3: Send success response
+            return res
+                .status(HttpStatus.OK)
+                .json({ message: 'Success processing task' });
+        } catch (error) {
+            this.logger.error('Error processing task:', error);
+            return res
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .json({ message: 'Error processing task', error: error.message });
+        } finally {
+            // Step 4: Cleanup temporary files
+            try {
+                this.logger.debug('Cleaning up temporary files...');
+                await this.video.deleteFile(sourcePath);
+                this.logger.debug('Temporary files cleaned up.');
+            } catch (cleanupError) {
+                this.logger.warn('Error during cleanup:', cleanupError);
+            }
+        }
+    }
+
 
     private groupByBucket(data) {
-        return data.reduce((acc, obj) => {
-            const { bucket, ...rest } = obj.toObject();
-            if (!acc[bucket]) {
-                acc[bucket] = [];
-            }
-            acc[bucket].push(rest);
-            return acc;
-        }, {});
-    }
+    return data.reduce((acc, obj) => {
+        const { bucket, ...rest } = obj.toObject();
+        if (!acc[bucket]) {
+            acc[bucket] = [];
+        }
+        acc[bucket].push(rest);
+        return acc;
+    }, {});
+}
 }
