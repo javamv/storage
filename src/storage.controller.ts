@@ -282,12 +282,9 @@ export class StorageController {
             await this.storage.downloadFile('l1-raw', objectName, sourcePath);
             this.logger.debug('File downloaded successfully.');
 
-
-            const dstPath = `${path.basename(objectName)}`;
-
             // Step 2: Initialize task ingestion
             this.logger.debug('Initializing task ingestion...');
-            await this.ingest.videoToDatalake(dstPath, projectName, sourcePath);
+            await this.ingest.videoToDatalake(objectName, projectName, sourcePath);
             this.logger.log('Task ingestion completed successfully.');
 
             // Step 3: Send success response

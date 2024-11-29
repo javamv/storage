@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { SObject, SObjectSchema } from './schemas/sobject.schema';
 import { ClientsModule } from '@nestjs/microservices';
 import { MinioConnector } from './connectors/minio.connector';
+import { KafkaConnector } from './connectors/kafka.connector';
 import { VideoService } from './services/video.service';
 import { StorageController } from './storage.controller';
 import { StorageService } from './services/storage.service';
@@ -50,6 +51,7 @@ import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioC
   providers: [
     ZipFileProcessorService,
     MinioConnector,
+    KafkaConnector,
     StorageService,
     VideoService,
     IngestService,

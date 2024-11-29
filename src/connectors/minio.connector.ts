@@ -116,11 +116,11 @@ export class MinioConnector {
         }
     }
 
-    async putObject(bucketName: string, targetFilePath: string, fullPath: string, metadata: Record<string, any> = {}): Promise<string> {
+    async putObject(bucketName: string, targetFilePath: string, fullPath: string, metadata: Record<string, any> = {}): Promise<any> {
         try {
             const info = await this.minioClient.fPutObject(bucketName, targetFilePath, fullPath, metadata);
             this.logger.log(`Uploaded ${fullPath} to ${bucketName}/${targetFilePath} with ETag: ${info.etag}`);
-            return info.etag;
+            return info;
         } catch (err) {
             this.logger.error(`Error uploading ${fullPath} to ${bucketName}/${targetFilePath}:`, err);
             throw err;

@@ -6,7 +6,7 @@
     "configurations": [
         {
             "command": "npm run start:dev",
-            "name": "Run npm start",
+            "name": "storage: run microservice",
             "request": "launch",
             "type": "node-terminal"
         }

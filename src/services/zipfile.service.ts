@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MinioConnector } from '../connectors/minio.connector';
+import { KafkaConnector } from '../connectors/kafka.connector';
 import * as unzipper from 'unzipper';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -10,8 +11,11 @@ export class ZipFileProcessorService {
 
     private readonly logger = new Logger(ZipFileProcessorService.name);
 
+    private readonly bucket = 'l4-dl';
+
     constructor(
         private readonly minio: MinioConnector,
+        private readonly kafka: KafkaConnector,
     ) { }
 
     private async unzipFile(fileStream: NodeJS.ReadableStream, targetDir: string): Promise<void> {
@@ -22,17 +26,44 @@ export class ZipFileProcessorService {
 
     private async uploadUnzippedContentToL4(localPath: string, dstPath: string): Promise<void> {
         // Upload each unzipped file to the l4-dl bucket
-        const files = await this.getFilesInDirectory(localPath); // Helper to list files
+        const files = await this.getFilesInDirectory(localPath, dstPath); // Helper to list files
         for (const file of files) {
-            const targetPath = path.join(dstPath, file.relativePath);
             const filePath = path.join(localPath, file.relativePath);
-            await this.minio.uploadFile('l4-dl', targetPath, filePath);
-            this.logger.log(`Uploaded ${filePath} to l4-dl/${targetPath}`);
+            // Check if the file is 'default.json'
+            if (file.relativePath === 'annotations/default.json') {
+                // Read and parse the content of default.json
+                const jsonContent = await this.readJsonFile(filePath);
+                // Store or process the parsed JSON as needed
+                this.logger.log('Parsed default.json:', jsonContent);
+                file.content = jsonContent;
+
+            } 
+            await this.minio.uploadFile(this.bucket, file.targetPath, filePath);
+            await this.kafka.publishAnnotationUpdate(file);
+            this.logger.log(`Uploaded ${filePath} to l4-dl/${file.targetPath}`);
         }
     }
 
-    private async getFilesInDirectory(dir: string): Promise<{ relativePath: string }[]> {
-        const files: { relativePath: string }[] = [];
+    // Helper function to read and parse a JSON file
+    private async readJsonFile(filePath: string): Promise<any> {
+        return new Promise((resolve, reject) => {
+            fs.readFile(filePath, 'utf8', (err, data) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    try {
+                        const jsonData = JSON.parse(data);
+                        resolve(jsonData);
+                    } catch (parseError) {
+                        reject(parseError);
+                    }
+                }
+            });
+        });
+    }
+
+    private async getFilesInDirectory(dir: string, dstPath: string): Promise<any[]> {
+        const files: any[] = [];
 
         // Helper function to read files recursively
         const readDirectory = (directory: string, basePath: string) => {
@@ -46,8 +77,9 @@ export class ZipFileProcessorService {
                     // If item is a directory, recurse into it
                     readDirectory(itemPath, basePath);
                 } else {
+                    const targetPath: string = path.join(dstPath, relativePath);
                     // If item is a file, add its relative path
-                    files.push({ relativePath });
+                    files.push({ targetPath, relativePath, dstPath, bucket: this.bucket });
                 }
             });
         };
