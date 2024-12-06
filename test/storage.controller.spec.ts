@@ -12,17 +12,17 @@ dotenv.config({ path: "./.env.dev" }); // Load the dev.env for this test
 describe("MinIOController (Integration)", () => {
   let app: INestApplication;
 
-// Helper function to create mock Mongoose documents
-const createMockDocument = (data: any) => {
-  // Mock the Mongoose Document structure
-  const mockDoc: any = {
-    ...data,
-    save: jest.fn().mockResolvedValue(data), // Mock the save method
-    toObject: jest.fn().mockReturnValue(data), // Simulate the toObject method
-    _id: new Types.ObjectId(), // Mock the ObjectId
+  // Helper function to create mock Mongoose documents
+  const createMockDocument = (data: any) => {
+    // Mock the Mongoose Document structure
+    const mockDoc: any = {
+      ...data,
+      save: jest.fn().mockResolvedValue(data), // Mock the save method
+      toObject: jest.fn().mockReturnValue(data), // Simulate the toObject method
+      _id: new Types.ObjectId(), // Mock the ObjectId
+    };
+    return mockDoc;
   };
-  return mockDoc;
-};
 
   const mockMinioConnector = {
     // Mock for listAllObjects, which handles multiple buckets

@@ -40,7 +40,7 @@ EOF
         echo "Response: $parsed_response"
 
         # Assert metadata is valid
-        metadata=$(echo "$response_body" | jq '.metadata')
+        metadata=$(echo "$response_body" | jq '.metadata.video')
         if [[ $(echo "$metadata" | jq 'has("length")') == "true" && \
               $(echo "$metadata" | jq 'has("bitRate")') == "true" && \
               $(echo "$metadata" | jq 'has("codec")') == "true" && \

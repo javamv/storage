@@ -8,17 +8,31 @@ import { Client as MinioClient } from 'minio';
 
 // GrpcOptions Factory
 export const grpcOptionsFactory = async (configService: ConfigService): Promise<GrpcOptions> => {
-  const grpcPort = configService.get<number>('GRPC_PORT') || 53004; // Use GRPC_PORT from .env or default to 53001
+  const grpcPort = configService.get<number>('GRPC_PORT') || 53004; // Use GRPC_PORT from .env or default to 53004
 
   return {
     transport: Transport.GRPC,
     options: {
-      package: 'auth', // Match this with your proto package name
-      protoPath: join(__dirname, 'auth/auth.proto'), // Adjust the path as necessary
+      package: 'storage', // Match this with your proto package name
+      protoPath: join(__dirname, 'storage.proto'), // Adjust the path as necessary
       url: `0.0.0.0:${grpcPort}`, // Set the gRPC server to listen on a different port
       onLoadPackageDefinition: (pkg, server) => {
         new ReflectionService(pkg).addToServer(server); // Enable gRPC reflection for service discovery
       },
+    },
+  };
+};
+
+// GrpcOptions Factory
+export const grpcAuthOptionsFactory = async (configService: ConfigService): Promise<GrpcOptions> => {
+  const authGrpcHost = configService.get<string>('AUTH_GRPC') || "localhost:53001"; // Use GRPC_PORT from .env or default to 53004
+
+  return {
+    transport: Transport.GRPC,
+    options: {
+      package: 'auth',
+      protoPath: join(__dirname, 'auth/auth.proto'),
+      url: authGrpcHost,
     },
   };
 };

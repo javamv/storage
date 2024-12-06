@@ -17,7 +17,7 @@ async function bootstrap() {
     allowedHeaders: 'Authorization, Content-Type', // Allow specific headers
   });
 
-  const port = configService.get<number>('PORT') || 3003;  // Optionally use a PORT from the .env
+  const port = configService.get<number>('PORT') || 3004;  // Optionally use a PORT from the .env
 
     // Run checkAndCreateBuckets before starting the services
     try {

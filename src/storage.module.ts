@@ -2,16 +2,21 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { SObject, SObjectSchema } from './schemas/sobject.schema';
+import { Tag, TagSchema } from './schemas/tag.schema';
 import { ClientsModule } from '@nestjs/microservices';
 import { MinioConnector } from './connectors/minio.connector';
 import { KafkaConnector } from './connectors/kafka.connector';
 import { VideoService } from './services/video.service';
 import { StorageController } from './storage.controller';
+import { MetaController } from './smeta/smeta.controller';
 import { StorageService } from './services/storage.service';
+import { TagService } from './tags/tag.service';
+import { TagController } from './tags/tag.controller';
 import { IngestService } from './services/ingest.service';
 import { ZipFileProcessorService } from './services/zipfile.service';
 import { ScheduleModule } from '@nestjs/schedule';
-import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioClientFactory } from './storage.config';
+import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioClientFactory, grpcAuthOptionsFactory } from './storage.config';
+import { AuthGuard } from './auth/auth.guard.rpc';
 
 @Module({
   imports: [
@@ -29,12 +34,20 @@ import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioC
     // Mongoose schema registration
     MongooseModule.forFeature([
       { name: SObject.name, schema: SObjectSchema },
+      { name: Tag.name, schema: TagSchema },
     ]),
     // Registering gRPC service
     ClientsModule.registerAsync([
       {
-        name: 'AUTH_PACKAGE',
+        name: 'SMETA_PACKAGE',
         useFactory: grpcOptionsFactory,
+        inject: [ConfigService],
+      },
+    ]),
+    ClientsModule.registerAsync([
+      {
+        name: 'AUTH_PACKAGE',
+        useFactory: grpcAuthOptionsFactory,
         inject: [ConfigService],
       },
     ]),
@@ -47,7 +60,7 @@ import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioC
       },
     ]),
   ],
-  controllers: [StorageController],
+  controllers: [StorageController, MetaController, TagController],
   providers: [
     ZipFileProcessorService,
     MinioConnector,
@@ -55,6 +68,8 @@ import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioC
     StorageService,
     VideoService,
     IngestService,
+    TagService,
+    AuthGuard,
     {
       provide: 'MINIO_CLIENT',
       useFactory: minioClientFactory,

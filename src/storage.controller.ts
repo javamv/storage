@@ -126,7 +126,7 @@ export class StorageController {
         try {
             const filePath = await this.storage.downloadFile(bucketName, objectName, tempFilePath);
             const metadata = await this.video.extractMetadata(filePath);
-            const updatedObjects = await this.db.storeMetadata(bucketName, objectName, metadata);
+            const updatedObjects = await this.db.storeVideoMetadata(bucketName, objectName, metadata);
 
             fs.unlinkSync(filePath);
             return res.status(200).json(updatedObjects);
