@@ -15,8 +15,9 @@ import { TagController } from './tags/tag.controller';
 import { IngestService } from './services/ingest.service';
 import { ZipFileProcessorService } from './services/zipfile.service';
 import { ScheduleModule } from '@nestjs/schedule';
-import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioClientFactory, grpcAuthOptionsFactory } from './storage.config';
+import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory, minioClientFactory, grpcAuthOptionsFactory, s3ClientFactory } from './storage.config';
 import { AuthGuard } from './auth/auth.guard.rpc';
+import { S3Connector } from './connectors/s3.connector';
 
 @Module({
   imports: [
@@ -63,7 +64,6 @@ import { AuthGuard } from './auth/auth.guard.rpc';
   controllers: [StorageController, MetaController, TagController],
   providers: [
     ZipFileProcessorService,
-    MinioConnector,
     KafkaConnector,
     StorageService,
     VideoService,
@@ -71,11 +71,15 @@ import { AuthGuard } from './auth/auth.guard.rpc';
     TagService,
     AuthGuard,
     {
-      provide: 'MINIO_CLIENT',
-      useFactory: minioClientFactory,
+      provide: 'S3_CLIENT',
+      useFactory: s3ClientFactory,
       inject: [ConfigService],
     },
+    {
+      provide: 'StorageConnector', 
+      useClass: S3Connector, 
+    },
   ],
-  exports: ['MINIO_CLIENT', MinioConnector, VideoService], // Export the client for use in other services
+  exports: ['S3_CLIENT', 'StorageConnector', VideoService], // Export the client for use in other services
 })
 export class StorageModule {}

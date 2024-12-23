@@ -1,7 +1,7 @@
-import { Controller, Get, Post, Body, Query, Req, Res, UseGuards, UploadedFiles, HttpStatus, UseInterceptors, Logger, Headers } from '@nestjs/common';
-import { MinioConnector } from './connectors/minio.connector';  // Assume you create a service to interact with MinIO
-import { VideoService } from './services/video.service';  // Assume this handles video metadata extraction
-import { IngestService } from './services/ingest.service';  // Assume this handles video metadata extraction
+import { Controller, Get, Post, Body, Query, Req, Res, UseGuards, UploadedFiles, HttpStatus, UseInterceptors, Logger, Headers, Inject } from '@nestjs/common';
+import { StorageConnector } from './connectors/storage.connector';
+import { VideoService } from './services/video.service';  
+import { IngestService } from './services/ingest.service';  
 import { StorageService } from './services/storage.service';  // Mongo service to interact with your database
 import { AuthGuard } from './auth/auth.guard.rpc';  // Auth guard for route protection
 import * as fs from 'fs';
@@ -16,7 +16,7 @@ export class StorageController {
     private readonly logger = new Logger(StorageController.name);
 
     constructor(
-        private readonly storage: MinioConnector,
+        @Inject('StorageConnector') private readonly storage: StorageConnector,
         private readonly video: VideoService,
         private readonly db: StorageService,
         private readonly ingest: IngestService,

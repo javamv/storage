@@ -1,15 +1,17 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { Client as MinioClient } from 'minio';
+import { StorageConnector } from './storage.connector';
+import { Readable } from 'stream';
 
 @Injectable()
-export class MinioConnector {
+export class MinioConnector implements StorageConnector {
 
     private readonly logger = new Logger(MinioConnector.name);
 
     private readonly lockKey: string = 'default-lock-key';
 
     constructor(
-        @Inject('MINIO_CLIENT') private readonly minioClient: MinioClient,
+        @Inject('S3_CLIENT') private readonly minioClient: MinioClient,
     ) { }
 
     async downloadFile(bucketName: string, objectName: string, filePath: string): Promise<string> {
@@ -67,24 +69,24 @@ export class MinioConnector {
     }
 
     // Fetch full object as a data stream
-    async getObject(bucketName: string, objectName: string): Promise<NodeJS.ReadableStream> {
+    async getObject(bucketName: string, objectName: string): Promise<Readable> {
         try {
             const dataStream = await this.minioClient.getObject(bucketName, objectName);
             this.logger.log(`Successfully fetched the full object ${objectName} from bucket ${bucketName}`);
-            return dataStream;
+            return dataStream as Readable;
         } catch (err) {
             this.logger.error(`Error fetching the full object ${objectName} from MinIO bucket ${bucketName}:`, err);
             throw err;
         }
     }
 
-    async getPartialObject(bucketName: string, objectName: string, offset: number, length: number, getOpts: object = {}): Promise<NodeJS.ReadableStream> {
+    async getPartialObject(bucketName: string, objectName: string, offset: number, length: number, getOpts: object = {}): Promise<Readable> {
         try {
             // Use MinIO's getPartialObject API to fetch a part of the object starting from 'offset' and with a given 'length'
             const dataStream = await this.minioClient.getPartialObject(bucketName, objectName, offset, length, getOpts);
 
             this.logger.log(`Successfully fetched partial object ${objectName} from bucket ${bucketName}, offset: ${offset}, length: ${length}`);
-            return dataStream;
+            return dataStream as Readable;
         } catch (err) {
             this.logger.error(`Error fetching partial object ${objectName} from MinIO bucket ${bucketName}:`, err);
             throw err;

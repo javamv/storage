@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { MinioConnector } from '../connectors/minio.connector';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { StorageConnector } from '../connectors/storage.connector';
 import { KafkaConnector } from '../connectors/kafka.connector';
 import * as unzipper from 'unzipper';
 import * as path from 'path';
@@ -14,7 +14,7 @@ export class ZipFileProcessorService {
     private readonly bucket = 'l4-dl';
 
     constructor(
-        private readonly minio: MinioConnector,
+        @Inject('StorageConnector') private readonly storage: StorageConnector,
         private readonly kafka: KafkaConnector,
     ) { }
 
@@ -38,7 +38,7 @@ export class ZipFileProcessorService {
                 file.content = jsonContent;
 
             } 
-            await this.minio.uploadFile(this.bucket, file.targetPath, filePath);
+            await this.storage.uploadFile(this.bucket, file.targetPath, filePath);
             await this.kafka.publishAnnotationUpdate(file);
             this.logger.log(`Uploaded ${filePath} to l4-dl/${file.targetPath}`);
         }
@@ -97,16 +97,16 @@ export class ZipFileProcessorService {
     @Cron(CronExpression.EVERY_10_SECONDS)
     async checkNewZipFiles(): Promise<void> {
         // Ensure the lock is acquired before processing
-        const lockAcquired = await this.minio.acquireLock();
+        const lockAcquired = await this.storage.acquireLock();
         if (!lockAcquired) return;
 
         try {
-            const objects = await this.minio.listAllObjects('l2-prep', 'annotations/');
+            const objects = await this.storage.listAllObjects('l2-prep', 'annotations/');
             for (const obj of objects) {
                 if (obj.name.endsWith('.zip')) {
                     this.logger.log(`New zip file detected: ${obj.name}`);
                     // Download the zip file
-                    const fileStream = await this.minio.getObject('l2-prep', obj.name);
+                    const fileStream = await this.storage.getObject('l2-prep', obj.name);
 
                     // Decode filename into the target path (e.g., test---file.zip -> test/file)
                     const fileName = path.basename(obj.name, '.zip');
@@ -120,7 +120,7 @@ export class ZipFileProcessorService {
                     await this.uploadUnzippedContentToL4(tempDir, `${decodedPath}`);
 
                     // Remove the processed object from l2-prep bucket
-                    await this.minio.removeObject('l2-prep', obj.name);
+                    await this.storage.removeObject('l2-prep', obj.name);
                     this.logger.log(`Processed and removed ${obj.name} from l2-prep`);
                 }
             }
@@ -128,7 +128,7 @@ export class ZipFileProcessorService {
             this.logger.error('Error checking or processing zip files:', err);
         } finally {
             // Release the lock
-            await this.minio.releaseLock();
+            await this.storage.releaseLock();
         }
     }
 }
