@@ -4,7 +4,6 @@ import * as request from "supertest";
 import { StorageModule } from "../src/storage.module"; // Replace with the actual module containing your controller
 import * as dotenv from "dotenv";
 import { Types } from "mongoose";
-import { MinioConnector } from "../src/connectors/minio.connector";
 import { StorageService } from "../src/services/storage.service";
 
 dotenv.config({ path: "./.env.dev" }); // Load the dev.env for this test
@@ -24,7 +23,7 @@ describe("MinIOController (Integration)", () => {
     return mockDoc;
   };
 
-  const mockMinioConnector = {
+  const mockStorageConnector = {
     // Mock for listAllObjects, which handles multiple buckets
     listAllObjects: jest.fn().mockImplementation((bucket) => {
       // Generate unique objects based on the bucket name
@@ -106,8 +105,8 @@ describe("MinIOController (Integration)", () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [StorageModule],
     })
-      .overrideProvider(MinioConnector) // Replace with your actual service token
-      .useValue(mockMinioConnector)
+      .overrideProvider("StorageConnector") // Replace with your actual service token
+      .useValue(mockStorageConnector)
       .overrideProvider(StorageService) // Replace with your actual service token
       .useValue(mockStorageService)
       .compile();
@@ -135,13 +134,13 @@ describe("MinIOController (Integration)", () => {
       "l2-prep": [{ name: "l2-prep-file1.txt", "active": true }],
     });
 
-    expect(mockMinioConnector.listAllObjects).toHaveBeenCalledTimes(3);
+    expect(mockStorageConnector.listAllObjects).toHaveBeenCalledTimes(3);
     expect(mockStorageService.updateBucketData).toHaveBeenCalledTimes(1);
     expect(mockStorageService.getAllActiveObjects).toHaveBeenCalledTimes(1);
   });
 
   it("/sync-minio-structure (GET) - Error", async () => {
-    mockMinioConnector.listAllObjects.mockRejectedValueOnce(
+    mockStorageConnector.listAllObjects.mockRejectedValueOnce(
       new Error("MinIO Service Error")
     );
 
@@ -152,6 +151,6 @@ describe("MinIOController (Integration)", () => {
     expect(response.status).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
     expect(response.body).toEqual({ error: "MinIO Service Error" });
 
-    expect(mockMinioConnector.listAllObjects).toHaveBeenCalledTimes(3);
+    expect(mockStorageConnector.listAllObjects).toHaveBeenCalledTimes(3);
   });
 });

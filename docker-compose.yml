@@ -17,6 +17,20 @@ services:
     networks:
       - shared_network
 
+  ceph:
+    image: ceph/daemon:latest-mimic
+    container_name: ceph
+    environment:
+      MON_IP: 127.0.0.1
+      CEPH_PUBLIC_NETWORK: 0.0.0.0/0
+      CEPH_DAEMON: DEMO
+    ports:
+      - "6789:6789"  # Ceph Monitor port
+      - "7480:7480"  # RADOS Gateway (S3-compatible API)
+    privileged: true
+    networks:
+      - shared_network
+
   mongodb:
     image: mongo:8.0-rc
     container_name: mongodb
@@ -59,10 +73,10 @@ services:
       - AUTH_GRPC=muraxa-auth:53001
       - MONGO_URI=mongodb://mongodb:27017
       - DB_NAME=storage
-      - MINIO_ENDPOINT=minio
-      - MINIO_PORT=9000
-      - MINIO_ACCESS_KEY=admin
-      - MINIO_SECRET_KEY=adminadmin12
+      - STORAGE_ENDPOINT=minio
+      - STORAGE_PORT=9000
+      - STORAGE_ACCESS_KEY=admin
+      - STORAGE_SECRET_KEY=adminadmin12
       - PORT=3004
       - KAFKA_BROKER_URL=broker:9094
     depends_on:

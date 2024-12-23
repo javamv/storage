@@ -3,12 +3,11 @@ import { StorageModule } from './storage.module';
 import { ConfigService } from '@nestjs/config';
 import { MicroserviceOptions } from '@nestjs/microservices';
 import { grpcOptionsFactory, kafkaOptionsFactory, mongooseOptionsFactory } from './storage.config'; // Import both factories
-import { MinioConnector } from './connectors/minio.connector';
 
 async function bootstrap() {
   const app = await NestFactory.create(StorageModule);
   const configService = app.get(ConfigService);
-  const storage = app.get(MinioConnector);
+  const storage = app.get('StorageConnector');
 
   app.enableCors({
     origin: '*', // Allow all origins

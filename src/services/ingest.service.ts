@@ -1,6 +1,6 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { VideoService } from "./video.service";
-import { MinioConnector } from "../connectors/minio.connector";
+import { StorageConnector } from "../connectors/storage.connector";
 import { KafkaConnector } from "../connectors/kafka.connector";
 import * as path from "path";
 import * as fs from "fs";
@@ -11,7 +11,7 @@ export class IngestService {
 
   constructor(
     private readonly videoService: VideoService,
-    private readonly minioConnector: MinioConnector,
+    @Inject('StorageConnector') private readonly storage: StorageConnector,
     private readonly kafka: KafkaConnector
   ) {}
 
@@ -78,7 +78,7 @@ export class IngestService {
     
         if (!fs.lstatSync(fullPath).isDirectory()) {
           // Upload file to MinIO
-          const info = await this.minioConnector.putObject(bucketName,targetFilePath,fullPath);
+          const info = await this.storage.putObject(bucketName,targetFilePath,fullPath);
           framePublisher?.recordFrameMetadata(fileCount++, fileName, targetFilePath, info.etag, bucketName);
         }
       }

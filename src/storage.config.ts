@@ -5,6 +5,7 @@ import { ReflectionService } from '@grpc/reflection';
 import { MongooseModuleOptions } from '@nestjs/mongoose';
 import * as mongoose from 'mongoose';
 import { Client as MinioClient } from 'minio';
+import { S3Client } from '@aws-sdk/client-s3';
 
 // GrpcOptions Factory
 export const grpcOptionsFactory = async (configService: ConfigService): Promise<GrpcOptions> => {
@@ -68,11 +69,11 @@ export const mongooseOptionsFactory = async (configService: ConfigService): Prom
 };
 
 export const minioClientFactory = async (configService: ConfigService): Promise<MinioClient> => {
-  const endPoint = configService.get<string>('MINIO_ENDPOINT', 'localhost');
-  const port = parseInt(configService.get<string>('MINIO_PORT', '9000'), 10);
-  const useSSL = configService.get<string>('MINIO_USE_SSL', 'false') === 'true'; // Convert string to boolean
-  const accessKey = configService.get<string>('MINIO_ACCESS_KEY', 'admin');
-  const secretKey = configService.get<string>('MINIO_SECRET_KEY', 'adminadmin12');
+  const endPoint = configService.get<string>('STORAGE_ENDPOINT', 'localhost');
+  const port = parseInt(configService.get<string>('STORAGE_PORT', '9000'), 10);
+  const useSSL = configService.get<string>('STORAGE_USE_SSL', 'false') === 'true'; // Convert string to boolean
+  const accessKey = configService.get<string>('STORAGE_ACCESS_KEY', 'admin');
+  const secretKey = configService.get<string>('STORAGE_SECRET_KEY', 'adminadmin12');
 
   console.log('MinIO Client Config:', { endPoint, port, useSSL, accessKey, secretKey });
 
@@ -87,5 +88,36 @@ export const minioClientFactory = async (configService: ConfigService): Promise<
   } catch (error) {
     console.error('Error initializing MinIO client:', error);
     throw error;
+  }
+};
+
+// Factory method for creating S3Client instance
+export const s3ClientFactory = async (configService: ConfigService): Promise<S3Client> => {
+  const endPoint = configService.get<string>('STORAGE_ENDPOINT', 'localhost');
+  const port = parseInt(configService.get<string>('STORAGE_PORT', '9000'), 10);
+  const useSSL = configService.get<string>('STORAGE_USE_SSL', 'false') === 'true';
+  const accessKey = configService.get<string>('STORAGE_ACCESS_KEY', 'admin');
+  const secretKey = configService.get<string>('STORAGE_SECRET_KEY', 'adminadmin12');
+
+  console.log('MinIO Client Config:', { endPoint, port, useSSL, accessKey, secretKey });
+
+  try {
+
+      // Create an S3Client instance 
+      const s3Client = new S3Client({
+          region: 'us-west-1', // Example region, can be configured based on your needs
+          endpoint: `http${useSSL ? 's' : ''}://${endPoint}:${port}`,
+          credentials: {
+              accessKeyId: accessKey,
+              secretAccessKey: secretKey,
+          },
+          forcePathStyle: true, // MinIO requires path-style URLs
+      });
+
+      console.log('S3 Client Created Successfully.');
+      return s3Client;
+  } catch (error) {
+      console.error('Error creating S3Client:', error);
+      throw error;
   }
 };
